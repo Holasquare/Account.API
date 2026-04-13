@@ -7,7 +7,7 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: dotnetmicroservices-repo
-  CLUSTER_NAME: my-eks-cluster
+  CLUSTER_NAME: dotnetservice
 
 jobs:
 
