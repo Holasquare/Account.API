@@ -1,0 +1,66 @@
+name: CI-CD to EKS
+
+on:
+  push:
+    branches: [ "master" ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: dotnetmicroservices-repo
+  CLUSTER_NAME: my-eks-cluster
+
+jobs:
+
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Build & Test
+      run: |
+        dotnet restore
+        dotnet build --configuration Release
+        dotnet test
+
+    - name: Configure AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to ECR
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build Docker image
+      run: |
+        docker build -t $ECR_REPOSITORY .
+
+    - name: Tag & Push image
+      run: |
+        ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        IMAGE_URI=$ACCOUNT_ID.dkr.ecr.${AWS_REGION}.amazonaws.com/$ECR_REPOSITORY:latest
+
+        docker tag $ECR_REPOSITORY:latest $IMAGE_URI
+        docker push $IMAGE_URI
+
+        echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+    - name: Update kubeconfig
+      run: |
+        aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
+
+    - name: Deploy to Kubernetes
+      run: |
+        kubectl apply -f k8s/deployment.yml
+        kubectl apply -f k8s/service.yml
+
+        kubectl set image deployment/dotnetmicroservices-repo-deployment dotnetmicroservices-repo=$IMAGE_URI
