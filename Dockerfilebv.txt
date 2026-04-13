@@ -1,0 +1,19 @@
+# Stage 1: Build the application
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy csproj and restore
+COPY ["Account.Api.csproj", "./"]
+RUN dotnet restore "./Account.Api.csproj"
+
+# Copy all source files and publish
+COPY . .
+RUN dotnet publish "Account.Api.csproj" -c Release -o /app/publish
+
+# Stage 2: Runtime image
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+EXPOSE 80
+
+ENTRYPOINT ["dotnet", "Account.Api.dll"]

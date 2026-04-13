@@ -1,0 +1,17 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# copy everything (correct context)
+COPY . .
+
+# restore from solution or API project
+RUN dotnet restore "src/Services/Account/Account.API/Account.API.csproj"
+
+# publish
+RUN dotnet publish "src/Services/Account/Account.API/Account.API.csproj" -c Release -o /app/publish
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+WORKDIR /app
+COPY --from=build /app/publish .
+
+ENTRYPOINT ["dotnet", "Account.API.dll"]
